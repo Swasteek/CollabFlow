@@ -21,11 +21,7 @@ const getProjects = async (req, res) => {
             data: projects
         });
     } catch (error) {
-        console.error('Get projects error:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Server error fetching projects'
-        });
+        next(error);
     }
 };
 
@@ -61,11 +57,7 @@ const createProject = async (req, res) => {
             data: populatedProject
         });
     } catch (error) {
-        console.error('Create project error:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Server error creating project'
-        });
+        next(error);
     }
 };
 
@@ -99,11 +91,7 @@ const getProject = async (req, res) => {
             }
         });
     } catch (error) {
-        console.error('Get project error:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Server error fetching project'
-        });
+        next(error);
     }
 };
 
@@ -144,11 +132,7 @@ const updateProject = async (req, res) => {
             data: project
         });
     } catch (error) {
-        console.error('Update project error:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Server error updating project'
-        });
+        next(error);
     }
 };
 
@@ -180,17 +164,13 @@ const deleteProject = async (req, res) => {
             data: {}
         });
     } catch (error) {
-        console.error('Delete project error:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Server error deleting project'
-        });
+        next(error);
     }
 };
 
 // @desc    Invite members to project
 // @route   POST /api/projects/:id/invite
-// @access  Private (Project owner)
+// @access  Private (Project owner or PM)
 const inviteMembers = async (req, res) => {
     try {
         const { emails } = req.body;
@@ -224,16 +204,27 @@ const inviteMembers = async (req, res) => {
         const invitedUsers = [];
         const alreadyMembers = [];
 
+        // Process each user
         users.forEach(user => {
             const isMember = project.members.some(
                 member => member.user.toString() === user._id.toString()
             );
 
             if (!isMember) {
+                let projectRole = 'member';
+
+                // Set project role based on user's global role
+                if (user.role === 'PM' || user.role === 'admin') {
+                    projectRole = 'pm';
+                } else if (user.role === 'Client') {
+                    projectRole = 'client';
+                }
+
                 project.members.push({
                     user: user._id,
-                    role: 'member'
+                    role: projectRole
                 });
+
                 invitedUsers.push(user);
             } else {
                 alreadyMembers.push(user);
@@ -242,10 +233,31 @@ const inviteMembers = async (req, res) => {
 
         await project.save();
 
+        // Log activity for each invited user
+        for (const user of invitedUsers) {
+            await Activity.create({
+                project: project._id,
+                user: req.user._id,
+                action: 'member_added',
+                metadata: {
+                    invitedUserName: user.name,
+                    invitedUserEmail: user.email
+                }
+            });
+        }
+
         // Populate members
         const populatedProject = await Project.findById(project._id)
             .populate('owner', 'name email avatar')
-            .populate('members.user', 'name email avatar');
+            .populate('members.user', 'name email avatar role');
+
+        // Broadcast real-time updates (if you have socket.io setup)
+        if (req.io) {
+            req.io.to(project._id.toString()).emit('members:updated', {
+                projectId: project._id,
+                members: populatedProject.members
+            });
+        }
 
         res.status(200).json({
             success: true,
@@ -254,21 +266,164 @@ const inviteMembers = async (req, res) => {
                 invited: invitedUsers.map(user => ({
                     id: user._id,
                     name: user.name,
-                    email: user.email
+                    email: user.email,
+                    role: user.role
                 })),
                 alreadyMembers: alreadyMembers.map(user => ({
                     id: user._id,
                     name: user.name,
-                    email: user.email
+                    email: user.email,
+                    role: user.role
                 }))
             }
         });
     } catch (error) {
-        console.error('Invite members error:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Server error inviting members'
+        next(error);
+    }
+};
+
+// @desc    Remove member from project
+// @route   DELETE /api/projects/:projectId/members/:userId
+// @access  Private (Project owner or PM)
+const removeMember = async (req, res) => {
+    try {
+        const { projectId, userId } = req.params;
+
+        // Check if user is trying to remove themselves
+        if (userId === req.user._id.toString()) {
+            return res.status(400).json({
+                success: false,
+                error: 'Cannot remove yourself from project'
+            });
+        }
+
+        const project = await Project.findById(projectId);
+
+        if (!project) {
+            return res.status(404).json({
+                success: false,
+                error: 'Project not found'
+            });
+        }
+
+        // Check if target user is the owner
+        if (project.owner.toString() === userId) {
+            return res.status(400).json({
+                success: false,
+                error: 'Cannot remove project owner'
+            });
+        }
+
+        // Remove member
+        project.members = project.members.filter(
+            member => member.user.toString() !== userId
+        );
+
+        await project.save();
+
+        // Log activity
+        const removedUser = await User.findById(userId);
+        await Activity.create({
+            project: project._id,
+            user: req.user._id,
+            action: 'member_removed',
+            metadata: {
+                removedUserName: removedUser?.name || 'Unknown',
+                removedUserEmail: removedUser?.email || 'Unknown'
+            }
         });
+
+        const populatedProject = await Project.findById(project._id)
+            .populate('owner', 'name email avatar')
+            .populate('members.user', 'name email avatar role');
+
+        // Broadcast update
+        if (req.io) {
+            req.io.to(project._id.toString()).emit('members:updated', {
+                projectId: project._id,
+                members: populatedProject.members
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            data: populatedProject
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// @desc    Update member role in project
+// @route   PUT /api/projects/:projectId/members/:userId
+// @access  Private (Project owner or PM)
+const updateMemberRole = async (req, res) => {
+    try {
+        const { projectId, userId } = req.params;
+        const { role } = req.body;
+
+        if (!role || !['owner', 'pm', 'member', 'client'].includes(role)) {
+            return res.status(400).json({
+                success: false,
+                error: 'Valid role is required (owner, pm, member, client)'
+            });
+        }
+
+        const project = await Project.findById(projectId);
+
+        if (!project) {
+            return res.status(404).json({
+                success: false,
+                error: 'Project not found'
+            });
+        }
+
+        // Find member
+        const memberIndex = project.members.findIndex(
+            member => member.user.toString() === userId
+        );
+
+        if (memberIndex === -1) {
+            return res.status(404).json({
+                success: false,
+                error: 'Member not found in project'
+            });
+        }
+
+        // Update role
+        project.members[memberIndex].role = role;
+        await project.save();
+
+        // Log activity
+        const updatedUser = await User.findById(userId);
+        await Activity.create({
+            project: project._id,
+            user: req.user._id,
+            action: 'member_role_updated',
+            metadata: {
+                userName: updatedUser?.name || 'Unknown',
+                newRole: role
+            }
+        });
+
+        const populatedProject = await Project.findById(project._id)
+            .populate('owner', 'name email avatar')
+            .populate('members.user', 'name email avatar role');
+
+        // Broadcast update
+        if (req.io) {
+            req.io.to(project._id.toString()).emit('members:updated', {
+                projectId: project._id,
+                members: populatedProject.members
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            data: populatedProject
+        });
+    } catch (error) {
+        next(error);
     }
 };
 
@@ -278,5 +433,7 @@ module.exports = {
     getProject,
     updateProject,
     deleteProject,
-    inviteMembers
+    inviteMembers,
+    removeMember,
+    updateMemberRole
 };

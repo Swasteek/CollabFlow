@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Project = require('../models/Project');
+const logger = require('../utils/logger');
 
 module.exports = (io) => {
     // Socket authentication middleware
@@ -29,7 +30,7 @@ module.exports = (io) => {
     });
 
     io.on('connection', (socket) => {
-        console.log(`User connected: ${socket.userId} (${socket.user.name})`);
+        logger.info(`User connected: ${socket.userId} (${socket.user.name})`);
 
         // Join project room
         socket.on('project:join', async (projectId) => {
@@ -65,7 +66,11 @@ module.exports = (io) => {
                 // Broadcast to room that user joined (except sender)
                 socket.to(projectId).emit('user:joined', {
                     userId: socket.userId,
-                    user: socket.user
+                    user: {
+                        name: socket.user.name,
+                        avatar: socket.user.avatar,
+                        role: socket.user.role // Add this
+                    }
                 });
 
                 // Send current active users to new joiner
@@ -73,9 +78,9 @@ module.exports = (io) => {
                     users: activeUsers
                 });
 
-                console.log(`User ${socket.userId} joined project ${projectId}`);
+                logger.info(`User ${socket.userId} joined project ${projectId}`);
             } catch (error) {
-                console.error('Project join error:', error);
+                logger.error('Project join error:', error);
                 socket.emit('error', { message: 'Server error' });
             }
         });
@@ -86,7 +91,7 @@ module.exports = (io) => {
             socket.to(projectId).emit('user:left', {
                 userId: socket.userId
             });
-            console.log(`User ${socket.userId} left project ${projectId}`);
+            logger.info(`User ${socket.userId} left project ${projectId}`);
         });
 
         // Handle manual task move (from drag & drop)
@@ -113,14 +118,14 @@ module.exports = (io) => {
                 });
 
             } catch (error) {
-                console.error('Task move socket error:', error);
+                logger.error('Task move socket error:', error);
                 socket.emit('error', { message: 'Server error' });
             }
         });
 
         // Handle disconnection
         socket.on('disconnect', () => {
-            console.log(`User disconnected: ${socket.userId}`);
+            logger.info(`User disconnected: ${socket.userId}`);
             // Note: Socket.io automatically handles leaving rooms on disconnect
         });
     });

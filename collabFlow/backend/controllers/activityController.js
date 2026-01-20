@@ -27,11 +27,7 @@ const getProjectActivities = async (req, res) => {
             }
         });
     } catch (error) {
-        console.error('Get activities error:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Server error fetching activities'
-        });
+        next(error);
     }
 };
 

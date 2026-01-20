@@ -7,9 +7,11 @@ const {
     getProject,
     updateProject,
     deleteProject,
-    inviteMembers
+    inviteMembers,
+    removeMember,
+    updateMemberRole
 } = require('../controllers/projectController');
-const { protect, isProjectMember, isProjectOwner } = require('../middleware/auth');
+const { protect, isProjectMember, isProjectOwner, authorize } = require('../middleware/auth');
 const validate = require('../middleware/validator');
 
 // Validation rules
@@ -35,6 +37,14 @@ const inviteMembersValidation = [
         .withMessage('Please provide at least one email')
 ];
 
+const updateMemberRoleValidation = [
+    body('role')
+        .notEmpty()
+        .withMessage('Role is required')
+        .isIn(['owner', 'pm', 'member', 'client'])
+        .withMessage('Role must be owner, pm, member, or client')
+];
+
 // All routes require authentication
 router.use(protect);
 
@@ -46,6 +56,10 @@ router.post('/', createProjectValidation, validate, createProject);
 router.get('/:id', isProjectMember, getProject);
 router.put('/:id', isProjectOwner, createProjectValidation, validate, updateProject);
 router.delete('/:id', isProjectOwner, deleteProject);
+
+// Member management routes
 router.post('/:id/invite', isProjectOwner, inviteMembersValidation, validate, inviteMembers);
+router.delete('/:id/members/:userId', isProjectOwner, removeMember);
+router.put('/:id/members/:userId', isProjectOwner, updateMemberRoleValidation, validate, updateMemberRole);
 
 module.exports = router;

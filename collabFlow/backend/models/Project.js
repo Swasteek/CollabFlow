@@ -24,7 +24,7 @@ const projectSchema = new mongoose.Schema({
         },
         role: {
             type: String,
-            enum: ['owner', 'member'],
+            enum: ['owner', 'pm', 'member', 'client'], // Align with user roles
             default: 'member'
         },
         joinedAt: {

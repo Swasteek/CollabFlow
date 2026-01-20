@@ -95,11 +95,7 @@ const createTask = async (req, res) => {
             data: populatedTask
         });
     } catch (error) {
-        console.error('Create task error:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Server error creating task'
-        });
+        next(error);
     }
 };
 
@@ -197,11 +193,7 @@ const updateTask = async (req, res) => {
             data: updatedTask
         });
     } catch (error) {
-        console.error('Update task error:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Server error updating task'
-        });
+        next(error);
     }
 };
 
@@ -263,11 +255,7 @@ const deleteTask = async (req, res) => {
             data: {}
         });
     } catch (error) {
-        console.error('Delete task error:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Server error deleting task'
-        });
+        next(error);
     }
 };
 
@@ -336,11 +324,7 @@ const moveTask = async (req, res) => {
             data: updatedTask
         });
     } catch (error) {
-        console.error('Move task error:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Server error moving task'
-        });
+        next(error);
     }
 };
 

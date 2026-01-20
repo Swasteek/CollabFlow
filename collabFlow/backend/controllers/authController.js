@@ -34,15 +34,12 @@ const signup = async (req, res) => {
                 id: user._id,
                 name: user.name,
                 email: user.email,
-                avatar: user.avatar
+                avatar: user.avatar,
+                role: user.role
             }
         });
     } catch (error) {
-        console.error('Signup error:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Server error during signup'
-        });
+        next(error);
     }
 };
 
@@ -83,15 +80,12 @@ const login = async (req, res) => {
                 id: user._id,
                 name: user.name,
                 email: user.email,
-                avatar: user.avatar
+                avatar: user.avatar,
+                role: user.role // Add this line
             }
         });
     } catch (error) {
-        console.error('Login error:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Server error during login'
-        });
+        next(error);
     }
 };
 
@@ -106,15 +100,12 @@ const getMe = async (req, res) => {
                 id: req.user._id,
                 name: req.user.name,
                 email: req.user.email,
-                avatar: req.user.avatar
+                avatar: req.user.avatar,
+                role: req.user.role // Add this line
             }
         });
     } catch (error) {
-        console.error('Get me error:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Server error'
-        });
+        next(error);
     }
 };
 

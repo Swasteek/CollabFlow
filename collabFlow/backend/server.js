@@ -6,6 +6,7 @@ const rateLimit = require('express-rate-limit');
 const mongoSanitize = require('express-mongo-sanitize');
 const dotenv = require('dotenv');
 const socketio = require('socket.io');
+const logger = require('./utils/logger');
 
 // Load environment variables
 dotenv.config();
@@ -64,9 +65,6 @@ app.use(express.urlencoded({ extended: true }));
 // Data sanitization against NoSQL injection
 app.use(mongoSanitize());
 
-// Connect to MongoDB
-connectDB();
-
 // Import socket handlers
 require('./sockets/projectHandlers')(io);
 require('./sockets/taskHandlers')(io);
@@ -97,17 +95,21 @@ app.get('/', (req, res) => {
     res.send('Backend is running 🚀');
 });
 
-
 const PORT = process.env.PORT || 5000;
 
-server.listen(PORT, () => {
-    console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+// Connect to MongoDB and start server
+connectDB().then(() => {
+    server.listen(PORT, () => {
+        logger.info(`Server running in ${process.env.NODE_ENV} mode on port ${PORT} ✅`);
+    });
+}).catch((err) => {
+    logger.error('Failed to connect to MongoDB:', err.message);
+    process.exit(1);
 });
 
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (err) => {
-    console.log('UNHANDLED REJECTION! 💥 Shutting down...');
-    console.log(err.name, err.message);
+    logger.error('UNHANDLED REJECTION! 💥 Shutting down...', err);
     server.close(() => {
         process.exit(1);
     });
@@ -115,7 +117,6 @@ process.on('unhandledRejection', (err) => {
 
 // Handle uncaught exceptions
 process.on('uncaughtException', (err) => {
-    console.log('UNCAUGHT EXCEPTION! 💥 Shutting down...');
-    console.log(err.name, err.message);
+    logger.error('UNCAUGHT EXCEPTION! 💥 Shutting down...', err);
     process.exit(1);
 });

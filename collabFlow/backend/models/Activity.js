@@ -11,6 +11,7 @@ const activitySchema = new mongoose.Schema({
         ref: 'User',
         required: true
     },
+    // In models/Activity.js, update the action enum:
     action: {
         type: String,
         enum: [
@@ -20,6 +21,8 @@ const activitySchema = new mongoose.Schema({
             'task_deleted',
             'task_assigned',
             'member_added',
+            'member_removed',
+            'member_role_updated',
             'project_created',
             'project_updated'
         ],

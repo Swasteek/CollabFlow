@@ -7,8 +7,10 @@ const {
     deleteTask,
     moveTask
 } = require('../controllers/taskController');
-const { protect } = require('../middleware/auth');
+// const { protect } = require('../middleware/auth');
 const validate = require('../middleware/validator');
+// Add this middleware at the top of routes/tasks.js
+const { protect, authorize } = require('../middleware/auth');
 
 // Validation rules
 const createTaskValidation = [
@@ -82,6 +84,6 @@ router.use(protect);
 router.post('/', createTaskValidation, validate, createTask);
 router.put('/:id/move', moveTaskValidation, validate, moveTask);
 router.put('/:id', updateTaskValidation, validate, updateTask);
-router.delete('/:id', deleteTask);
+router.delete('/:id', protect, authorize('admin', 'PM'), deleteTask);
 
 module.exports = router;

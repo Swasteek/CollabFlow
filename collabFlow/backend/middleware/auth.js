@@ -122,9 +122,55 @@ const isProjectOwner = async (req, res, next) => {
         });
     }
 };
+// Add after the existing middleware functions
 
+const authorize = (...roles) => {
+    return (req, res, next) => {
+        if (!req.user) {
+            return res.status(401).json({
+                success: false,
+                error: 'Not authenticated'
+            });
+        }
+
+        if (!roles.includes(req.user.role)) {
+            return res.status(403).json({
+                success: false,
+                error: `User role ${req.user.role} is not authorized to access this route`
+            });
+        }
+
+        next();
+    };
+};
+
+// Specific role checkers
+const isAdmin = (req, res, next) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({
+            success: false,
+            error: 'Access denied. Admin only'
+        });
+    }
+    next();
+};
+
+const isPM = (req, res, next) => {
+    if (!['admin', 'PM'].includes(req.user.role)) {
+        return res.status(403).json({
+            success: false,
+            error: 'Access denied. Project Manager or Admin only'
+        });
+    }
+    next();
+};
+
+// Update exports at the bottom
 module.exports = {
     protect,
     isProjectMember,
-    isProjectOwner
+    isProjectOwner,
+    authorize,  // Add this
+    isAdmin,    // Add this
+    isPM        // Add this
 };
