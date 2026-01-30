@@ -1,15 +1,49 @@
-import React, { useState } from 'react';
-import { X, FolderPlus } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { X, FolderPlus, Rocket } from 'lucide-react';
 import { toast } from 'react-toastify';
 
 const CreateProjectModal = ({ isOpen, onClose, onCreate }) => {
     const [formData, setFormData] = useState({
         name: '',
-        description: ''
+        description: '',
+        members: []
     });
+    const [memberEmail, setMemberEmail] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const memberInputRef = useRef(null);
 
     if (!isOpen) return null;
+
+    const handleAddMember = (e) => {
+        if (e.key === 'Enter' && memberEmail.trim()) {
+            e.preventDefault();
+            const email = memberEmail.trim().toLowerCase();
+            
+            // Basic email validation
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                toast.error('Please enter a valid email address');
+                return;
+            }
+
+            if (formData.members.includes(email)) {
+                toast.error('This email is already added');
+                return;
+            }
+
+            setFormData({
+                ...formData,
+                members: [...formData.members, email]
+            });
+            setMemberEmail('');
+        }
+    };
+
+    const handleRemoveMember = (email) => {
+        setFormData({
+            ...formData,
+            members: formData.members.filter(m => m !== email)
+        });
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -29,13 +63,14 @@ const CreateProjectModal = ({ isOpen, onClose, onCreate }) => {
                 description: formData.description,
                 taskCount: 0,
                 activeTaskCount: 0,
-                members: [1], // Current user
+                members: formData.members.length + 1, // Current user + invited members
                 updatedAt: 'Just now'
             };
 
             onCreate(newProject);
             toast.success('Project created successfully!');
-            setFormData({ name: '', description: '' }); // Reset form
+            setFormData({ name: '', description: '', members: [] }); // Reset form
+            setMemberEmail('');
             setIsLoading(false);
             onClose();
         }, 800);
@@ -54,13 +89,12 @@ const CreateProjectModal = ({ isOpen, onClose, onCreate }) => {
 
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)] bg-slate-800/50">
-                    <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                        <FolderPlus className="text-blue-500" size={20} />
+                    <h3 className="text-lg font-semibold text-white">
                         Create New Project
                     </h3>
                     <button
                         onClick={onClose}
-                        className="text-slate-400 hover:text-white transition-colors"
+                        className="text-slate-400 hover:text-white transition-colors p-1 hover:bg-slate-700/50 rounded-lg"
                     >
                         <X size={20} />
                     </button>
@@ -81,13 +115,43 @@ const CreateProjectModal = ({ isOpen, onClose, onCreate }) => {
                     </div>
 
                     <div className="form-group">
-                        <label className="form-label">Description <span className="text-slate-500 font-normal">(Optional)</span></label>
+                        <label className="form-label">Project Description</label>
                         <textarea
                             className="form-input resize-none h-24"
-                            placeholder="What is this project about?"
+                            placeholder="Add a brief description about project goals, timelines, and visibility..."
                             value={formData.description}
                             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                         />
+                    </div>
+
+                    <div className="form-group">
+                        <label className="form-label">Invite Team Members</label>
+                        <div className="form-input min-h-[3rem] flex flex-wrap gap-2 items-center p-2">
+                            {formData.members.map((email, index) => (
+                                <span
+                                    key={index}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-500/20 text-blue-300 rounded-full text-sm border border-blue-500/30"
+                                >
+                                    {email}
+                                    <button
+                                        type="button"
+                                        onClick={() => handleRemoveMember(email)}
+                                        className="hover:text-blue-100 transition-colors"
+                                    >
+                                        <X size={14} />
+                                    </button>
+                                </span>
+                            ))}
+                            <input
+                                ref={memberInputRef}
+                                type="email"
+                                className="flex-1 min-w-[200px] bg-transparent border-none outline-none text-white placeholder-slate-500"
+                                placeholder="Type email and press enter..."
+                                value={memberEmail}
+                                onChange={(e) => setMemberEmail(e.target.value)}
+                                onKeyDown={handleAddMember}
+                            />
+                        </div>
                     </div>
 
                     <div className="flex items-center justify-end gap-3 mt-6">
@@ -101,9 +165,14 @@ const CreateProjectModal = ({ isOpen, onClose, onCreate }) => {
                         <button
                             type="submit"
                             disabled={isLoading}
-                            className="btn btn-primary py-2 px-5 text-sm"
+                            className="btn btn-primary py-2 px-5 text-sm flex items-center gap-2"
                         >
-                            {isLoading ? 'Creating...' : 'Create Project'}
+                            {isLoading ? 'Creating...' : (
+                                <>
+                                    Create Project
+                                    <Rocket size={16} />
+                                </>
+                            )}
                         </button>
                     </div>
                 </form>
