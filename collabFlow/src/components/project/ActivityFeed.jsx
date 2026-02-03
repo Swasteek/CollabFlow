@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Activity, Plus, Edit3, Trash2, ArrowRight, User, Clock, ChevronDown } from 'lucide-react';
 import { formatActivityTime } from '../../utils/dateHelpers';
+import { useActivityEvents } from '../../hooks/useSocket';
 
 // Activity type icons and colors
 const activityConfig = {
@@ -85,58 +86,75 @@ const ActivityItem = ({ activity }) => {
     const Icon = config.icon;
 
     const getActivityText = () => {
-        switch (activity.type) {
+        const { user, task, details, metadata, action } = activity;
+        const userName = <span className="font-medium text-white">{user?.name || 'Someone'}</span>;
+        const taskTitle = <span className="font-medium text-slate-200">"{task?.title || metadata?.taskTitle || 'a task'}"</span>;
+
+        // Action can come from 'type' (frontend mock) or 'action' (backend)
+        const activityType = activity.type || activity.action;
+
+        switch (activityType) {
             case 'task_created':
-                return (
-                    <>
-                        <span className="font-medium text-white">{activity.user.name}</span>
-                        {' created '}
-                        <span className="font-medium text-slate-200">"{activity.task.title}"</span>
-                    </>
-                );
+                return <>{userName} created {taskTitle}</>;
+
             case 'task_moved':
+                const fromStatus = details?.from || metadata?.oldStatus;
+                const toStatus = details?.to || metadata?.newStatus;
                 return (
                     <>
-                        <span className="font-medium text-white">{activity.user.name}</span>
-                        {' moved '}
-                        <span className="font-medium text-slate-200">"{activity.task.title}"</span>
-                        {' to '}
-                        <span className={`font-medium ${config.color}`}>{activity.details.to}</span>
+                        {userName} moved {taskTitle}
+                        {toStatus && (
+                            <>
+                                {' to '}
+                                <span className="text-blue-400 font-medium">{toStatus}</span>
+                            </>
+                        )}
                     </>
                 );
-            case 'task_assigned':
-                return (
-                    <>
-                        <span className="font-medium text-white">{activity.user.name}</span>
-                        {' assigned '}
-                        <span className="font-medium text-slate-200">"{activity.task.title}"</span>
-                        {' to '}
-                        <span className="font-medium text-blue-400">{activity.details.assignee}</span>
-                    </>
-                );
+
             case 'task_updated':
+                const changes = metadata?.changes;
+                if (changes && Object.keys(changes).length > 0) {
+                    const changedFields = Object.keys(changes);
+                    const field = changedFields[0]; // Show the first change for brevity
+                    const { old: oldValue, new: newValue } = changes[field];
+
+                    // Format some common fields for better readability
+                    const displayField = field.charAt(0).toUpperCase() + field.slice(1);
+
+                    return (
+                        <>
+                            {userName} updated <span className="text-slate-400">{field}</span> of {taskTitle}
+                            {newValue !== undefined && (
+                                <>
+                                    {' to '}
+                                    <span className="text-blue-400 font-medium">{String(newValue)}</span>
+                                </>
+                            )}
+                        </>
+                    );
+                }
+                return <>{userName} updated {taskTitle}</>;
+
+            case 'task_assigned':
+                const assignee = details?.assignee || (metadata?.changes?.assignee?.new);
                 return (
                     <>
-                        <span className="font-medium text-white">{activity.user.name}</span>
-                        {' updated '}
-                        <span className="font-medium text-slate-200">"{activity.task.title}"</span>
+                        {userName} assigned {taskTitle}
+                        {assignee && (
+                            <>
+                                {' to '}
+                                <span className="font-medium text-blue-400">{assignee}</span>
+                            </>
+                        )}
                     </>
                 );
+
             case 'task_deleted':
-                return (
-                    <>
-                        <span className="font-medium text-white">{activity.user.name}</span>
-                        {' deleted '}
-                        <span className="font-medium text-slate-200">"{activity.task.title}"</span>
-                    </>
-                );
+                return <>{userName} deleted {taskTitle}</>;
+
             default:
-                return (
-                    <>
-                        <span className="font-medium text-white">{activity.user.name}</span>
-                        {' performed an action'}
-                    </>
-                );
+                return <>{userName} performed an action on {taskTitle}</>;
         }
     };
 
@@ -196,10 +214,14 @@ const ActivityFeed = ({ projectId, isOpen = true, onToggle }) => {
         }
     }, [projectId]);
 
-    // Add new activity (called from socket events)
-    const addActivity = useCallback((newActivity) => {
-        setActivities(prev => [newActivity, ...prev].slice(0, 20));
+    // Add new activity
+    const addActivity = useCallback((data) => {
+        const activity = data.activity || data;
+        setActivities(prev => [activity, ...prev].slice(0, 20));
     }, []);
+
+    // Subscribe to real-time activity events
+    useActivityEvents(addActivity);
 
     const loadMore = async () => {
         // Mock load more
@@ -247,8 +269,8 @@ const ActivityFeed = ({ projectId, isOpen = true, onToggle }) => {
                     </div>
                 ) : (
                     <div className="py-2">
-                        {activities.map(activity => (
-                            <ActivityItem key={activity.id} activity={activity} />
+                        {activities.map((activity, index) => (
+                            <ActivityItem key={activity._id || activity.id || `activity-${index}`} activity={activity} />
                         ))}
 
                         {hasMore && (

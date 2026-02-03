@@ -133,7 +133,9 @@ export const useProjects = () => {
                 // Real API call
                 const response = await projectsAPI.getById(id);
                 const projectData = extractResponseData(response);
-                return transformProjectFromBackend(projectData);
+                // Handle the { project, tasks } wrapper or direct project object
+                const actualProject = projectData.project || projectData;
+                return transformProjectFromBackend(actualProject);
             }
         } catch (err) {
             const errorMessage = err.response?.data?.error || err.response?.data?.message || err.message || 'Failed to load project';

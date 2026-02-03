@@ -1,236 +1,66 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DragDropContext } from '@hello-pangea/dnd';
 import TaskColumn from '../components/project/TaskColumn';
 import Navbar from '../components/shared/Navbar';
 import TaskDetailModal from '../components/project/TaskDetailModal';
 import ActivityFeed from '../components/project/ActivityFeed';
 import ActiveUsers from '../components/project/ActiveUsers';
-import { Users, Settings, Filter, ArrowLeft, Plus, Activity, X } from 'lucide-react';
+import { Settings, Filter, ArrowLeft, Plus, Activity } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useSocket, useTaskEvents, usePresenceEvents } from '../hooks/useSocket';
+import { useSocket } from '../hooks/useSocket';
 import { useProjects } from '../hooks/useProjects';
+import { useTasks } from '../hooks/useTasks';
 import { toast } from 'react-toastify';
 import { PageLoader } from '../components/shared/LoadingSpinner';
-import { transformTaskFromBackend, toFrontendStatus } from '../utils/apiHelpers';
-
-// Initial board structure
-const createInitialBoardData = () => ({
-    tasks: {
-        'task-1': { id: 'task-1', title: 'Design Landing Page', description: '', priority: 'High', assignee: 'Alice', dueDate: 'Oct 24', status: 'To Do' },
-        'task-2': { id: 'task-2', title: 'Setup React Project', description: '', priority: 'High', assignee: 'Bob', dueDate: 'Oct 20', status: 'To Do' },
-        'task-3': { id: 'task-3', title: 'Implement Auth', description: '', priority: 'Medium', assignee: 'Charlie', dueDate: 'Oct 25', status: 'In Progress' },
-        'task-4': { id: 'task-4', title: 'Database Schema', description: '', priority: 'Low', assignee: 'Alice', dueDate: 'Oct 28', status: 'Done' },
-    },
-    columns: {
-        'col-1': { id: 'col-1', title: 'To Do', taskIds: ['task-1', 'task-2'] },
-        'col-2': { id: 'col-2', title: 'In Progress', taskIds: ['task-3'] },
-        'col-3': { id: 'col-3', title: 'Done', taskIds: ['task-4'] },
-    },
-    columnOrder: ['col-1', 'col-2', 'col-3'],
-});
 
 const ProjectBoard = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const { fetchProject } = useProjects();
-    const { joinProject, leaveProject, emitTaskMoved, emitTaskCreated, emitTaskUpdated, emitTaskDeleted, connected } = useSocket();
-    
+    const { connected } = useSocket();
+    const {
+        tasks,
+        columns,
+        columnOrder,
+        isLoading: tasksLoading,
+        fetchTasks,
+        createTask,
+        updateTask,
+        deleteTask,
+        moveTask
+    } = useTasks(id);
+
     const [project, setProject] = useState(null);
-    const [data, setData] = useState(null);
     const [selectedTask, setSelectedTask] = useState(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [isLoading, setIsLoading] = useState(true);
+    const [isLoadingProject, setIsLoadingProject] = useState(true);
     const [showActivityFeed, setShowActivityFeed] = useState(true);
-    const [activeUsers, setActiveUsers] = useState([
-        { id: 1, name: 'Alice', status: 'active' },
-        { id: 2, name: 'Bob', status: 'active' }
-    ]);
+
+    // Search and Filter State
+    const [searchTerm, setSearchTerm] = useState('');
+    const [priorityFilter, setPriorityFilter] = useState('All');
 
     // Load project and tasks data
     useEffect(() => {
         const loadData = async () => {
-            setIsLoading(true);
+            setIsLoadingProject(true);
             try {
                 const projectData = await fetchProject(id);
                 setProject(projectData);
-                
-                // Load tasks from localStorage or use initial data
-                const storedTasks = localStorage.getItem(`tasks_${id}`);
-                if (storedTasks) {
-                    setData(JSON.parse(storedTasks));
-                } else {
-                    const initialData = createInitialBoardData();
-                    localStorage.setItem(`tasks_${id}`, JSON.stringify(initialData));
-                    setData(initialData);
-                }
+                await fetchTasks(id);
             } catch (error) {
                 toast.error('Failed to load project');
                 navigate('/dashboard');
             } finally {
-                setIsLoading(false);
+                setIsLoadingProject(false);
             }
         };
-        
+
         loadData();
-    }, [id, fetchProject, navigate]);
-
-    // Join project room on mount
-    useEffect(() => {
-        if (id && connected) {
-            joinProject(id);
-        }
-        
-        return () => {
-            if (id) {
-                leaveProject(id);
-            }
-        };
-    }, [id, connected, joinProject, leaveProject]);
-
-    // Save data to localStorage whenever it changes
-    const saveData = useCallback((newData) => {
-        localStorage.setItem(`tasks_${id}`, JSON.stringify(newData));
-    }, [id]);
-
-    // Real-time event handlers
-    const handleExternalTaskCreated = useCallback((eventData) => {
-        if (eventData.projectId !== id) return;
-        
-        // Transform task from backend format
-        const transformedTask = transformTaskFromBackend(eventData.task);
-        
-        setData(prev => {
-            const columnId = Object.keys(prev.columns).find(
-                colId => prev.columns[colId].title === transformedTask.status
-            ) || 'col-1';
-            
-            const newData = {
-                ...prev,
-                tasks: { ...prev.tasks, [transformedTask.id]: transformedTask },
-                columns: {
-                    ...prev.columns,
-                    [columnId]: {
-                        ...prev.columns[columnId],
-                        taskIds: [...prev.columns[columnId].taskIds, transformedTask.id]
-                    }
-                }
-            };
-            saveData(newData);
-            return newData;
-        });
-        
-        toast.info(`${eventData.username || 'Someone'} created a new task`);
-    }, [id, saveData]);
-
-    const handleExternalTaskUpdated = useCallback((eventData) => {
-        if (eventData.projectId !== id) return;
-        
-        setData(prev => {
-            const newData = {
-                ...prev,
-                tasks: {
-                    ...prev.tasks,
-                    [eventData.taskId]: { ...prev.tasks[eventData.taskId], ...eventData.updates }
-                }
-            };
-            saveData(newData);
-            return newData;
-        });
-    }, [id, saveData]);
-
-    const handleExternalTaskMoved = useCallback((eventData) => {
-        if (eventData.projectId !== id) return;
-        
-        // Convert backend status to frontend format
-        const frontendOldStatus = toFrontendStatus(eventData.oldStatus);
-        const frontendNewStatus = toFrontendStatus(eventData.newStatus);
-        
-        setData(prev => {
-            const sourceColId = Object.keys(prev.columns).find(
-                colId => prev.columns[colId].title === frontendOldStatus
-            );
-            const destColId = Object.keys(prev.columns).find(
-                colId => prev.columns[colId].title === frontendNewStatus
-            );
-            
-            if (!sourceColId || !destColId) return prev;
-            
-            const newColumns = { ...prev.columns };
-            newColumns[sourceColId] = {
-                ...newColumns[sourceColId],
-                taskIds: newColumns[sourceColId].taskIds.filter(taskId => taskId !== eventData.taskId)
-            };
-            newColumns[destColId] = {
-                ...newColumns[destColId],
-                taskIds: [...newColumns[destColId].taskIds, eventData.taskId]
-            };
-            
-            const newData = {
-                ...prev,
-                tasks: {
-                    ...prev.tasks,
-                    [eventData.taskId]: { ...prev.tasks[eventData.taskId], status: frontendNewStatus }
-                },
-                columns: newColumns
-            };
-            saveData(newData);
-            return newData;
-        });
-        
-        toast.info(`${eventData.username || 'Someone'} moved a task to ${frontendNewStatus}`);
-    }, [id, saveData]);
-
-    const handleExternalTaskDeleted = useCallback((eventData) => {
-        if (eventData.projectId !== id) return;
-        
-        setData(prev => {
-            const newTasks = { ...prev.tasks };
-            delete newTasks[eventData.taskId];
-            
-            const newColumns = { ...prev.columns };
-            Object.keys(newColumns).forEach(colId => {
-                newColumns[colId] = {
-                    ...newColumns[colId],
-                    taskIds: newColumns[colId].taskIds.filter(id => id !== eventData.taskId)
-                };
-            });
-            
-            const newData = { ...prev, tasks: newTasks, columns: newColumns };
-            saveData(newData);
-            return newData;
-        });
-        
-        toast.info(`${eventData.username || 'Someone'} deleted a task`);
-    }, [id, saveData]);
-
-    // Subscribe to task events
-    useTaskEvents({
-        onTaskCreated: handleExternalTaskCreated,
-        onTaskUpdated: handleExternalTaskUpdated,
-        onTaskMoved: handleExternalTaskMoved,
-        onTaskDeleted: handleExternalTaskDeleted
-    });
-
-    // Handle user presence
-    const handleUserJoined = useCallback((userData) => {
-        setActiveUsers(prev => {
-            if (prev.find(u => u.id === userData.userId)) return prev;
-            return [...prev, { id: userData.userId, name: userData.username, status: 'active' }];
-        });
-        toast.info(`${userData.username} joined the project`);
-    }, []);
-
-    const handleUserLeft = useCallback((userData) => {
-        setActiveUsers(prev => prev.filter(u => u.id !== userData.userId));
-    }, []);
-
-    usePresenceEvents({
-        onUserJoined: handleUserJoined,
-        onUserLeft: handleUserLeft
-    });
+    }, [id, fetchProject, fetchTasks, navigate]);
 
     // Drag and drop handler
-    const onDragEnd = (result) => {
+    const onDragEnd = async (result) => {
         const { destination, source, draggableId } = result;
 
         if (!destination) return;
@@ -242,45 +72,11 @@ const ProjectBoard = () => {
             return;
         }
 
-        const start = data.columns[source.droppableId];
-        const finish = data.columns[destination.droppableId];
-
-        // Moving in same column
-        if (start === finish) {
-            const newTaskIds = Array.from(start.taskIds);
-            newTaskIds.splice(source.index, 1);
-            newTaskIds.splice(destination.index, 0, draggableId);
-
-            const newColumn = { ...start, taskIds: newTaskIds };
-            const newData = { ...data, columns: { ...data.columns, [newColumn.id]: newColumn } };
-            setData(newData);
-            saveData(newData);
-            return;
+        try {
+            await moveTask(draggableId, source.droppableId, destination.droppableId, source.index, destination.index);
+        } catch (error) {
+            // Error already handled by hook/toast
         }
-
-        // Moving between columns
-        const startTaskIds = Array.from(start.taskIds);
-        startTaskIds.splice(source.index, 1);
-        const newStart = { ...start, taskIds: startTaskIds };
-
-        const finishTaskIds = Array.from(finish.taskIds);
-        finishTaskIds.splice(destination.index, 0, draggableId);
-        const newFinish = { ...finish, taskIds: finishTaskIds };
-
-        // Update task status
-        const updatedTask = { ...data.tasks[draggableId], status: finish.title };
-
-        const newData = {
-            ...data,
-            tasks: { ...data.tasks, [draggableId]: updatedTask },
-            columns: { ...data.columns, [newStart.id]: newStart, [newFinish.id]: newFinish },
-        };
-        
-        setData(newData);
-        saveData(newData);
-        
-        // Emit socket event
-        emitTaskMoved(draggableId, start.title, finish.title, id);
     };
 
     const handleTaskClick = (task) => {
@@ -288,81 +84,53 @@ const ProjectBoard = () => {
         setIsModalOpen(true);
     };
 
-    const handleAddTask = (columnId) => {
-        const newTaskId = `task-${Date.now()}`;
-        const newTask = {
-            id: newTaskId,
-            title: 'New Task',
-            description: '',
-            priority: 'Medium',
-            assignee: '',
-            status: data.columns[columnId].title,
-            dueDate: ''
-        };
-
-        const newTasks = { ...data.tasks, [newTaskId]: newTask };
-        const newColumn = {
-            ...data.columns[columnId],
-            taskIds: [...data.columns[columnId].taskIds, newTaskId]
-        };
-
-        const newData = {
-            ...data,
-            tasks: newTasks,
-            columns: { ...data.columns, [columnId]: newColumn }
-        };
-        
-        setData(newData);
-        saveData(newData);
-
-        // Emit socket event
-        emitTaskCreated(newTask, id);
-
-        // Open modal immediately
-        setSelectedTask(newTask);
-        setIsModalOpen(true);
+    const handleAddTask = async (columnId) => {
+        try {
+            const newTask = await createTask(columnId, {
+                title: 'New Task',
+                priority: 'Medium'
+            });
+            setSelectedTask(newTask);
+            setIsModalOpen(true);
+        } catch (error) {
+            // Error already handled
+        }
     };
 
-    const handleUpdateTask = (updatedTask) => {
-        const newData = {
-            ...data,
-            tasks: {
-                ...data.tasks,
-                [updatedTask.id]: updatedTask
-            }
-        };
-        
-        setData(newData);
-        saveData(newData);
-        
-        // Emit socket event
-        emitTaskUpdated(updatedTask.id, updatedTask, id);
+    const handleUpdateTask = async (updatedTask) => {
+        try {
+            await updateTask(updatedTask.id, updatedTask);
+        } catch (error) {
+            // Error already handled
+        }
     };
 
-    const handleDeleteTask = (taskId) => {
-        // Remove from tasks
-        const newTasks = { ...data.tasks };
-        delete newTasks[taskId];
-
-        // Remove from columns
-        const newColumns = { ...data.columns };
-        Object.keys(newColumns).forEach(colId => {
-            newColumns[colId] = {
-                ...newColumns[colId],
-                taskIds: newColumns[colId].taskIds.filter(id => id !== taskId)
-            };
-        });
-
-        const newData = { ...data, tasks: newTasks, columns: newColumns };
-        setData(newData);
-        saveData(newData);
-        setIsModalOpen(false);
-        
-        // Emit socket event
-        emitTaskDeleted(taskId, id);
+    const handleDeleteTask = async (taskId) => {
+        try {
+            await deleteTask(taskId);
+            setIsModalOpen(false);
+        } catch (error) {
+            // Error already handled
+        }
     };
 
-    if (isLoading || !data) {
+    // Filter Logic
+    const getFilteredTasks = (taskIds) => {
+        return taskIds
+            .map(taskId => tasks[taskId])
+            .filter(task => {
+                if (!task) return false;
+
+                const matchesSearch = task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    (task.description && task.description.toLowerCase().includes(searchTerm.toLowerCase()));
+
+                const matchesPriority = priorityFilter === 'All' || task.priority === priorityFilter;
+
+                return matchesSearch && matchesPriority;
+            });
+    };
+
+    if (isLoadingProject || tasksLoading || !columnOrder.length) {
         return <PageLoader text="Loading project..." />;
     }
 
@@ -390,22 +158,45 @@ const ProjectBoard = () => {
                 </div>
 
                 <div className="flex items-center gap-3">
-                    {/* Active Users */}
+                    {/* Search Input */}
+                    <div className="relative group">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500 group-focus-within:text-blue-400">
+                            <Filter size={16} />
+                        </div>
+                        <input
+                            type="text"
+                            placeholder="Search tasks..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="bg-slate-900/50 border border-slate-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-48 pl-10 p-1.5 transition-all text-slate-200 placeholder-slate-500"
+                        />
+                    </div>
+
+                    {/* Priority Filter */}
+                    <select
+                        value={priorityFilter}
+                        onChange={(e) => setPriorityFilter(e.target.value)}
+                        className="bg-slate-800 border border-slate-700 text-slate-300 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-1.5 outline-none hover:bg-slate-700 transition-colors"
+                    >
+                        <option value="All">All Priority</option>
+                        <option value="High">High</option>
+                        <option value="Medium">Medium</option>
+                        <option value="Low">Low</option>
+                    </select>
+
+                    <div className="h-6 w-px bg-slate-700 mx-1"></div>
+
                     <ActiveUsers projectId={id} />
 
                     <div className="h-6 w-px bg-slate-700 mx-1"></div>
 
-                    <button className="flex items-center gap-1.5 text-slate-300 hover:text-white px-3 py-1.5 rounded-lg hover:bg-slate-700 transition-colors text-sm font-medium">
-                        <Filter size={16} /> Filter
-                    </button>
-                    
-                    <button 
+                    <button
                         onClick={() => setShowActivityFeed(!showActivityFeed)}
                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors text-sm font-medium ${showActivityFeed ? 'bg-blue-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-700'}`}
                     >
                         <Activity size={16} /> Activity
                     </button>
-                    
+
                     <button className="flex items-center gap-1.5 text-slate-300 hover:text-white px-3 py-1.5 rounded-lg hover:bg-slate-700 transition-colors text-sm font-medium">
                         <Settings size={16} /> Settings
                     </button>
@@ -418,21 +209,20 @@ const ProjectBoard = () => {
                 <div className="flex-1 overflow-x-auto overflow-y-hidden">
                     <DragDropContext onDragEnd={onDragEnd}>
                         <div className="h-full flex p-6 gap-6 min-w-max">
-                            {data.columnOrder.map((columnId) => {
-                                const column = data.columns[columnId];
-                                const tasks = column.taskIds.map((taskId) => data.tasks[taskId]).filter(Boolean);
+                            {columnOrder.map((columnId) => {
+                                const column = columns[columnId];
+                                const filteredTasks = getFilteredTasks(column.taskIds);
                                 return (
                                     <TaskColumn
                                         key={column.id}
                                         column={column}
-                                        tasks={tasks}
+                                        tasks={filteredTasks}
                                         onAddTask={handleAddTask}
                                         onTaskClick={handleTaskClick}
                                     />
                                 );
                             })}
 
-                            {/* Add Column Button */}
                             <button className="w-80 h-12 rounded-xl bg-slate-800/30 border border-dashed border-slate-700 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all flex-shrink-0">
                                 <Plus size={20} className="mr-2" /> Add Column
                             </button>
@@ -442,8 +232,8 @@ const ProjectBoard = () => {
 
                 {/* Activity Feed Sidebar */}
                 {showActivityFeed && (
-                    <ActivityFeed 
-                        projectId={id} 
+                    <ActivityFeed
+                        projectId={id}
                         isOpen={showActivityFeed}
                         onToggle={() => setShowActivityFeed(false)}
                     />

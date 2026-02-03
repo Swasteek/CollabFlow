@@ -68,19 +68,21 @@ export const transformTaskFromBackend = (backendTask) => {
     };
 };
 
-/**
- * Transform task from frontend format to backend format
- */
 export const transformTaskToBackend = (frontendTask) => {
     const backendTask = {
         ...frontendTask,
         status: toBackendStatus(frontendTask.status || 'To Do'),
         priority: toBackendPriority(frontendTask.priority || 'Medium')
     };
-    
+
+    // Remove empty optional strings to avoid backend validation failures (e.g., empty dueDate)
+    if (!backendTask.assignee) delete backendTask.assignee;
+    if (!backendTask.dueDate) delete backendTask.dueDate;
+    if (!backendTask.description) delete backendTask.description;
+
     // Remove frontend-specific fields
     delete backendTask.id; // Backend uses _id
-    
+
     return backendTask;
 };
 
@@ -136,7 +138,7 @@ export const extractResponseData = (response) => {
 const formatRelativeTime = (date) => {
     const now = new Date();
     const diffInSeconds = Math.floor((now - date) / 1000);
-    
+
     if (diffInSeconds < 60) return 'Just now';
     if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
     if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;

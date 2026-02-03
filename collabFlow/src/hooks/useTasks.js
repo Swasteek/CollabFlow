@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
-import { tasksAPI } from '../services/api';
+import { tasksAPI, projectsAPI } from '../services/api';
 import { toast } from 'react-toastify';
-import { useSocket } from './useSocket';
+import { useSocket, useTaskEvents } from './useSocket';
 import {
     extractResponseData,
     transformTaskFromBackend,
@@ -22,6 +22,120 @@ export const useTasks = (projectId) => {
     const [error, setError] = useState(null);
 
     const { emitTaskCreated, emitTaskUpdated, emitTaskDeleted, emitTaskMoved } = useSocket();
+
+    // Handle external task updates (from socket events)
+    const handleExternalTaskCreated = useCallback((data) => {
+        const { task, projectId: eventProjectId } = data;
+        if (eventProjectId !== projectId) return;
+
+        // Transform task from backend format
+        const transformedTask = transformTaskFromBackend(task);
+
+        setTasks(prev => ({ ...prev, [transformedTask.id]: transformedTask }));
+        setColumns(prev => {
+            const columnId = Object.keys(prev).find(
+                colId => prev[colId].title === transformedTask.status
+            ) || 'col-1';
+
+            return {
+                ...prev,
+                [columnId]: {
+                    ...prev[columnId],
+                    taskIds: [...prev[columnId].taskIds, transformedTask.id]
+                }
+            };
+        });
+
+        toast.info(`New task created: ${transformedTask.title}`);
+    }, [projectId]);
+
+    const handleExternalTaskUpdated = useCallback((data) => {
+        const { taskId, updates, projectId: eventProjectId } = data;
+        if (eventProjectId !== projectId) return;
+
+        // Transform updates from backend format
+        const transformedUpdates = { ...updates };
+        if (updates.status) {
+            transformedUpdates.status = toFrontendStatus(updates.status);
+        }
+        if (updates.priority) {
+            transformedUpdates.priority = updates.priority.charAt(0).toUpperCase() + updates.priority.slice(1);
+        }
+
+        setTasks(prev => ({
+            ...prev,
+            [taskId]: { ...prev[taskId], ...transformedUpdates }
+        }));
+    }, [projectId]);
+
+    const handleExternalTaskDeleted = useCallback((data) => {
+        const { taskId, projectId: eventProjectId } = data;
+        if (eventProjectId !== projectId) return;
+
+        setTasks(prev => {
+            const newTasks = { ...prev };
+            delete newTasks[taskId];
+            return newTasks;
+        });
+
+        setColumns(prev => {
+            const newColumns = { ...prev };
+            Object.keys(newColumns).forEach(colId => {
+                newColumns[colId] = {
+                    ...newColumns[colId],
+                    taskIds: newColumns[colId].taskIds.filter(id => id !== taskId)
+                };
+            });
+            return newColumns;
+        });
+    }, [projectId]);
+
+    const handleExternalTaskMoved = useCallback((data) => {
+        const { taskId, oldStatus, newStatus, projectId: eventProjectId } = data;
+        if (eventProjectId !== projectId) return;
+
+        // Convert backend status to frontend format for matching
+        const frontendOldStatus = toFrontendStatus(oldStatus);
+        const frontendNewStatus = toFrontendStatus(newStatus);
+
+        setColumns(prev => {
+            const sourceColId = Object.keys(prev).find(
+                colId => prev[colId].title === frontendOldStatus
+            );
+            const destColId = Object.keys(prev).find(
+                colId => prev[colId].title === frontendNewStatus
+            );
+
+            if (!sourceColId || !destColId) return prev;
+
+            const newColumns = { ...prev };
+            newColumns[sourceColId] = {
+                ...newColumns[sourceColId],
+                taskIds: newColumns[sourceColId].taskIds.filter(id => id !== taskId)
+            };
+            newColumns[destColId] = {
+                ...newColumns[destColId],
+                taskIds: [...newColumns[destColId].taskIds, taskId]
+            };
+            return newColumns;
+        });
+
+        setTasks(prev => {
+            if (!prev[taskId]) return prev;
+            return {
+                ...prev,
+                [taskId]: { ...prev[taskId], status: frontendNewStatus }
+            };
+        });
+    }, [projectId]);
+
+    // Subscribe to task events
+    useTaskEvents({
+        onTaskCreated: handleExternalTaskCreated,
+        onTaskUpdated: handleExternalTaskUpdated,
+        onTaskMoved: handleExternalTaskMoved,
+        onTaskDeleted: handleExternalTaskDeleted
+    });
 
     // Initialize default board structure
     const initializeBoard = useCallback(() => {
@@ -77,8 +191,8 @@ export const useTasks = (projectId) => {
                     setColumnOrder(mockData.columnOrder);
                 }
             } else {
-                // Real API call
-                const response = await tasksAPI.getByProject(id);
+                // Real API call - fetch project which includes tasks
+                const response = await projectsAPI.getById(id);
                 const data = extractResponseData(response);
 
                 if (data.tasks && data.columns && data.columnOrder) {
@@ -369,105 +483,6 @@ export const useTasks = (projectId) => {
         }
     }, [tasks, columns, projectId, saveTasks, emitTaskMoved]);
 
-    // Handle external task updates (from socket events)
-    const handleExternalTaskCreated = useCallback((data) => {
-        const { task, projectId: eventProjectId } = data;
-        if (eventProjectId !== projectId) return;
-
-        // Transform task from backend format
-        const transformedTask = transformTaskFromBackend(task);
-
-        const columnId = Object.keys(columns).find(
-            colId => columns[colId].title === transformedTask.status
-        ) || 'col-1';
-
-        setTasks(prev => ({ ...prev, [transformedTask.id]: transformedTask }));
-        setColumns(prev => ({
-            ...prev,
-            [columnId]: {
-                ...prev[columnId],
-                taskIds: [...prev[columnId].taskIds, transformedTask.id]
-            }
-        }));
-    }, [projectId, columns]);
-
-    const handleExternalTaskUpdated = useCallback((data) => {
-        const { taskId, updates, projectId: eventProjectId } = data;
-        if (eventProjectId !== projectId) return;
-
-        // Transform updates from backend format
-        const transformedUpdates = { ...updates };
-        if (updates.status) {
-            transformedUpdates.status = toFrontendStatus(updates.status);
-        }
-        if (updates.priority) {
-            transformedUpdates.priority = updates.priority.charAt(0).toUpperCase() + updates.priority.slice(1);
-        }
-
-        setTasks(prev => ({
-            ...prev,
-            [taskId]: { ...prev[taskId], ...transformedUpdates }
-        }));
-    }, [projectId]);
-
-    const handleExternalTaskDeleted = useCallback((data) => {
-        const { taskId, projectId: eventProjectId } = data;
-        if (eventProjectId !== projectId) return;
-
-        setTasks(prev => {
-            const newTasks = { ...prev };
-            delete newTasks[taskId];
-            return newTasks;
-        });
-
-        setColumns(prev => {
-            const newColumns = { ...prev };
-            Object.keys(newColumns).forEach(colId => {
-                newColumns[colId] = {
-                    ...newColumns[colId],
-                    taskIds: newColumns[colId].taskIds.filter(id => id !== taskId)
-                };
-            });
-            return newColumns;
-        });
-    }, [projectId]);
-
-    const handleExternalTaskMoved = useCallback((data) => {
-        const { taskId, oldStatus, newStatus, projectId: eventProjectId } = data;
-        if (eventProjectId !== projectId) return;
-
-        // Convert backend status to frontend format for matching
-        const frontendOldStatus = toFrontendStatus(oldStatus);
-        const frontendNewStatus = toFrontendStatus(newStatus);
-
-        const sourceColId = Object.keys(columns).find(
-            colId => columns[colId].title === frontendOldStatus
-        );
-        const destColId = Object.keys(columns).find(
-            colId => columns[colId].title === frontendNewStatus
-        );
-
-        if (!sourceColId || !destColId) return;
-
-        setColumns(prev => {
-            const newColumns = { ...prev };
-            newColumns[sourceColId] = {
-                ...newColumns[sourceColId],
-                taskIds: newColumns[sourceColId].taskIds.filter(id => id !== taskId)
-            };
-            newColumns[destColId] = {
-                ...newColumns[destColId],
-                taskIds: [...newColumns[destColId].taskIds, taskId]
-            };
-            return newColumns;
-        });
-
-        setTasks(prev => ({
-            ...prev,
-            [taskId]: { ...prev[taskId], status: frontendNewStatus }
-        }));
-    }, [projectId, columns]);
-
     return {
         tasks,
         columns,
@@ -478,11 +493,7 @@ export const useTasks = (projectId) => {
         createTask,
         updateTask,
         deleteTask,
-        moveTask,
-        handleExternalTaskCreated,
-        handleExternalTaskUpdated,
-        handleExternalTaskDeleted,
-        handleExternalTaskMoved
+        moveTask
     };
 };
 
