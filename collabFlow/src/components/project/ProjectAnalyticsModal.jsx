@@ -94,8 +94,8 @@ const ProjectAnalyticsModal = ({ isOpen, onClose, projectId }) => {
                                                 <span>{analytics.taskCounts.todo}</span>
                                             </div>
                                             <div className="w-full bg-slate-700 h-2 rounded-full overflow-hidden">
-                                                <div 
-                                                    className="bg-slate-400 h-full rounded-full" 
+                                                <div
+                                                    className="bg-slate-400 h-full rounded-full"
                                                     style={{ width: `${analytics.totalTasks ? (analytics.taskCounts.todo / analytics.totalTasks) * 100 : 0}%` }}
                                                 ></div>
                                             </div>
@@ -106,8 +106,8 @@ const ProjectAnalyticsModal = ({ isOpen, onClose, projectId }) => {
                                                 <span>{analytics.taskCounts.inProgress}</span>
                                             </div>
                                             <div className="w-full bg-slate-700 h-2 rounded-full overflow-hidden">
-                                                <div 
-                                                    className="bg-blue-400 h-full rounded-full" 
+                                                <div
+                                                    className="bg-blue-400 h-full rounded-full"
                                                     style={{ width: `${analytics.totalTasks ? (analytics.taskCounts.inProgress / analytics.totalTasks) * 100 : 0}%` }}
                                                 ></div>
                                             </div>
@@ -118,8 +118,8 @@ const ProjectAnalyticsModal = ({ isOpen, onClose, projectId }) => {
                                                 <span>{analytics.taskCounts.done}</span>
                                             </div>
                                             <div className="w-full bg-slate-700 h-2 rounded-full overflow-hidden">
-                                                <div 
-                                                    className="bg-emerald-400 h-full rounded-full" 
+                                                <div
+                                                    className="bg-emerald-400 h-full rounded-full"
                                                     style={{ width: `${analytics.totalTasks ? (analytics.taskCounts.done / analytics.totalTasks) * 100 : 0}%` }}
                                                 ></div>
                                             </div>
@@ -139,7 +139,7 @@ const ProjectAnalyticsModal = ({ isOpen, onClose, projectId }) => {
                                             <div className="text-xs font-semibold text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">
                                                 {analytics.priorityCounts.low}
                                             </div>
-                                            <div 
+                                            <div
                                                 className="w-full bg-slate-600 rounded-t-md transition-all group-hover:bg-slate-500"
                                                 style={{ height: `${Math.max((analytics.priorityCounts.low / (analytics.totalTasks || 1)) * 100, 5)}%` }}
                                             ></div>
@@ -151,7 +151,7 @@ const ProjectAnalyticsModal = ({ isOpen, onClose, projectId }) => {
                                             <div className="text-xs font-semibold text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity">
                                                 {analytics.priorityCounts.medium}
                                             </div>
-                                            <div 
+                                            <div
                                                 className="w-full bg-blue-600 rounded-t-md transition-all group-hover:bg-blue-500"
                                                 style={{ height: `${Math.max((analytics.priorityCounts.medium / (analytics.totalTasks || 1)) * 100, 5)}%` }}
                                             ></div>
@@ -163,7 +163,7 @@ const ProjectAnalyticsModal = ({ isOpen, onClose, projectId }) => {
                                             <div className="text-xs font-semibold text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity">
                                                 {analytics.priorityCounts.high}
                                             </div>
-                                            <div 
+                                            <div
                                                 className="w-full bg-rose-600 rounded-t-md transition-all group-hover:bg-rose-500"
                                                 style={{ height: `${Math.max((analytics.priorityCounts.high / (analytics.totalTasks || 1)) * 100, 5)}%` }}
                                             ></div>

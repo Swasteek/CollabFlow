@@ -505,7 +505,7 @@ const getProjectAnalytics = async (req, res, next) => {
         const priorityCounts = { low: 0, medium: 0, high: 0 };
 
         tasks.forEach(task => {
-            if (task.status === 'to_do' || task.status === 'To Do') taskCounts.todo++;
+            if (task.status === 'todo' || task.status === 'to_do' || task.status === 'To Do') taskCounts.todo++;
             else if (task.status === 'in_progress' || task.status === 'In Progress') taskCounts.inProgress++;
             else if (task.status === 'done' || task.status === 'Done') taskCounts.done++;
 
