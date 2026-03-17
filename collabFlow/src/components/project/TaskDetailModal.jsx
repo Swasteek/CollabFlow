@@ -165,10 +165,10 @@ const TaskDetailModal = ({ isOpen, onClose, task, onDelete, onSave, onAddComment
                                 {task?.attachments?.length > 0 ? (
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
                                         {task.attachments.map(att => (
-                                            <a 
-                                                key={att._id} 
-                                                href={att.url} 
-                                                target="_blank" 
+                                            <a
+                                                key={att._id}
+                                                href={att.url}
+                                                target="_blank"
                                                 rel="noreferrer"
                                                 className="flex items-center gap-3 p-3 bg-slate-800/50 border border-slate-700 rounded-lg hover:border-blue-500 hover:bg-slate-800 transition-all group"
                                             >
@@ -190,7 +190,7 @@ const TaskDetailModal = ({ isOpen, onClose, task, onDelete, onSave, onAddComment
                             {/* Activity Section */}
                             <div>
                                 <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 block">Activity</label>
-                                
+
                                 {/* Existing Comments List */}
                                 <div className="space-y-3 mb-4 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
                                     {(task?.comments || []).map(comment => (
@@ -204,7 +204,7 @@ const TaskDetailModal = ({ isOpen, onClose, task, onDelete, onSave, onAddComment
                                                     <div className="flex items-center gap-2 text-slate-500 group-hover:text-slate-400">
                                                         <span className="text-xs">{new Date(comment.createdAt).toLocaleDateString()} {new Date(comment.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                                                         {(user?.id === comment.user?._id || user?.id === comment.user?.id || user?.role === 'pm' || user?.role === 'admin') && (
-                                                            <button 
+                                                            <button
                                                                 onClick={(e) => {
                                                                     e.preventDefault();
                                                                     onRemoveComment && onRemoveComment(task.id, comment._id);
@@ -266,19 +266,8 @@ const TaskDetailModal = ({ isOpen, onClose, task, onDelete, onSave, onAddComment
                                     </div>
                                 </div>
 
-                                {/* Status */}
-                                <div>
-                                    <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Status</label>
-                                    <select
-                                        className="w-full bg-slate-700 border-none rounded-lg text-sm text-white py-2 px-3 focus:ring-2 focus:ring-blue-500"
-                                        value={formData.status}
-                                        onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                                    >
-                                        <option>To Do</option>
-                                        <option>In Progress</option>
-                                        <option>Done</option>
-                                    </select>
-                                </div>
+
+
 
                                 {/* Priority */}
                                 <div>
