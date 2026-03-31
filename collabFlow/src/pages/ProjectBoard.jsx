@@ -6,7 +6,6 @@ import TaskDetailModal from '../components/project/TaskDetailModal';
 import ProjectSettingsModal from '../components/project/ProjectSettingsModal';
 import ProjectAnalyticsModal from '../components/project/ProjectAnalyticsModal';
 import ActivityFeed from '../components/project/ActivityFeed';
-import ActiveUsers from '../components/project/ActiveUsers';
 import ListView from '../components/project/ListView';
 import GanttView from '../components/project/GanttView';
 import DocsView from '../components/project/DocsView';
@@ -22,7 +21,7 @@ const ProjectBoard = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const { fetchProject, updateProjectColumns, updateProject, deleteProject } = useProjects();
-    const { connected } = useSocket();
+    const { connected, joinProject, leaveProject } = useSocket();
     const {
         tasks,
         columns,
@@ -71,6 +70,19 @@ const ProjectBoard = () => {
         loadData();
     }, [id, fetchProject, fetchTasks, navigate]);
 
+    // Join project room on mount and leave on unmount
+    useEffect(() => {
+        if (id) {
+            joinProject(id);
+        }
+
+        return () => {
+            if (id) {
+                leaveProject(id);
+            }
+        };
+    }, [id, joinProject, leaveProject]);
+
     // Drag and drop handler
     const onDragEnd = async (result) => {
         const { destination, source, draggableId, type } = result;
@@ -88,9 +100,9 @@ const ProjectBoard = () => {
             const newColumnOrder = Array.from(columnOrder);
             newColumnOrder.splice(source.index, 1);
             newColumnOrder.splice(destination.index, 0, draggableId);
-            
+
             setColumnOrder(newColumnOrder); // Optimistic UI update
-            
+
             const newBackendColumns = newColumnOrder.map((colId, index) => {
                 const col = columns[colId];
                 return {
@@ -249,7 +261,7 @@ const ProjectBoard = () => {
 
                     <div className="h-6 w-px bg-slate-700 mx-1"></div>
 
-                    <ActiveUsers projectId={id} />
+
 
                     <div className="h-6 w-px bg-slate-700 mx-1"></div>
 
@@ -339,7 +351,7 @@ const ProjectBoard = () => {
                                         })}
                                         {provided.placeholder}
 
-                                        <button 
+                                        <button
                                             onClick={handleAddColumn}
                                             className="w-80 h-12 rounded-xl bg-slate-800/30 border border-dashed border-slate-700 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all flex-shrink-0"
                                         >
@@ -352,7 +364,7 @@ const ProjectBoard = () => {
                     )}
 
                     {viewMode === 'list' && (
-                        <ListView 
+                        <ListView
                             tasks={tasks}
                             columns={columns}
                             columnOrder={columnOrder}
@@ -363,7 +375,7 @@ const ProjectBoard = () => {
                     )}
 
                     {viewMode === 'gantt' && (
-                        <GanttView 
+                        <GanttView
                             tasks={tasks}
                             filterFn={getFilteredTasks}
                             onTaskClick={handleTaskClick}
@@ -372,7 +384,7 @@ const ProjectBoard = () => {
 
                     {viewMode === 'docs' && project && (
                         <div className="flex-1 overflow-hidden p-6 max-w-6xl mx-auto w-full">
-                            <DocsView 
+                            <DocsView
                                 project={project}
                                 onUpdateProject={handleUpdateProject}
                             />

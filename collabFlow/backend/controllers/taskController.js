@@ -133,12 +133,14 @@ const createTask = async (req, res, next) => {
 
         // Broadcast real-time update
         req.io.to(projectId.toString()).emit('task:created', {
-            task: populatedTask
+            task: populatedTask,
+            projectId
         });
 
         req.io.to(projectId.toString()).emit('activity:new', {
             activity: await Activity.findById(activity._id)
-                .populate('user', 'name avatar')
+                .populate('user', 'name avatar'),
+            projectId
         });
 
         res.status(201).json({
@@ -236,12 +238,14 @@ const updateTask = async (req, res, next) => {
         // Broadcast real-time update
         req.io.to(project._id.toString()).emit('task:updated', {
             taskId: task._id,
-            updates: req.body
+            updates: req.body,
+            projectId: project._id
         });
 
         req.io.to(project._id.toString()).emit('activity:new', {
             activity: await Activity.findById(activity._id)
-                .populate('user', 'name avatar')
+                .populate('user', 'name avatar'),
+            projectId: project._id
         });
 
         res.status(200).json({
@@ -294,12 +298,14 @@ const deleteTask = async (req, res, next) => {
 
         // Broadcast real-time update
         req.io.to(projectId.toString()).emit('task:deleted', {
-            taskId: task._id
+            taskId: task._id,
+            projectId
         });
 
         req.io.to(projectId.toString()).emit('activity:new', {
             activity: await Activity.findById(activity._id)
-                .populate('user', 'name avatar')
+                .populate('user', 'name avatar'),
+            projectId
         });
 
         res.status(200).json({
@@ -367,12 +373,14 @@ const moveTask = async (req, res, next) => {
         req.io.to(task.project.toString()).emit('task:moved', {
             taskId: task._id,
             oldStatus,
-            newStatus
+            newStatus,
+            projectId: task.project
         });
 
         req.io.to(task.project.toString()).emit('activity:new', {
             activity: await Activity.findById(activity._id)
-                .populate('user', 'name avatar')
+                .populate('user', 'name avatar'),
+            projectId: task.project
         });
 
         res.status(200).json({

@@ -43,17 +43,12 @@ const TaskCard = ({ task, index, onClick }) => {
                                 </div>
                             )}
                         </div>
-
-                        {task.assignee && (
-                            <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-[10px] font-bold text-white border border-slate-700" title={task.assignee}>
-                                {task.assignee.charAt(0)}
-                            </div>
-                        )}
                     </div>
                 </div>
             )}
         </Draggable>
     );
 };
+
 
 export default TaskCard;
