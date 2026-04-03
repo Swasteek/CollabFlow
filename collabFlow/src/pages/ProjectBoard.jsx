@@ -132,22 +132,42 @@ const ProjectBoard = () => {
         setIsModalOpen(true);
     };
 
-    const handleAddTask = async (columnId) => {
-        try {
-            const newTask = await createTask(columnId, {
-                title: 'New Task',
-                priority: 'Medium'
-            });
-            setSelectedTask(newTask);
-            setIsModalOpen(true);
-        } catch (error) {
-            // Error already handled
-        }
+    const handleAddTask = (columnId) => {
+        // Create a draft task without saving to database
+        const draftTask = {
+            id: `draft-${Date.now()}`,
+            title: 'New Task',
+            description: '',
+            priority: 'Medium',
+            status: columns[columnId]?.title || 'To Do',
+            assignee: '',
+            dueDate: '',
+            startDate: '',
+            estimatedTime: 0,
+            subtasks: [],
+            customFields: {},
+            dependencies: [],
+            timeEntries: [],
+            isDraft: true  // Mark as draft
+        };
+        setSelectedTask(draftTask);
+        setIsModalOpen(true);
     };
 
     const handleUpdateTask = async (updatedTask) => {
         try {
-            await updateTask(updatedTask.id, updatedTask);
+            if (updatedTask.isDraft) {
+                // First time saving - create in database
+                const columnId = Object.keys(columns).find(
+                    colId => columns[colId].title === updatedTask.status
+                ) || Object.keys(columns)[0];
+
+                const newTask = await createTask(columnId, updatedTask);
+                setSelectedTask(newTask);
+            } else {
+                // Updating existing task
+                await updateTask(updatedTask.id, updatedTask);
+            }
         } catch (error) {
             // Error already handled
         }

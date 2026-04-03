@@ -10,6 +10,24 @@ const isProjectMember = (project, userId) => {
     return project.members.some(member => member.user.toString() === userId.toString());
 };
 
+// Helper to get user's role in project
+const getUserProjectRole = (project, userId) => {
+    const member = project.members.find(member => member.user.toString() === userId.toString());
+    return member ? member.role : null;
+};
+
+// Helper to check if user can delete tasks (Admin, Owner, or PM)
+const canDeleteTask = (user, project, userId) => {
+    // Global admin can delete tasks
+    if (user.role === 'admin') {
+        return true;
+    }
+
+    // Check project role
+    const projectRole = getUserProjectRole(project, userId);
+    return projectRole === 'owner' || projectRole === 'pm';
+};
+
 // @desc    Get tasks by project
 // @route   GET /api/projects/:projectId/tasks
 // @access  Private (Project member)
@@ -134,7 +152,7 @@ const createTask = async (req, res, next) => {
         // Broadcast real-time update
         req.io.to(projectId.toString()).emit('task:created', {
             task: populatedTask,
-            projectId
+            projectId: projectId.toString()
         });
 
         req.io.to(projectId.toString()).emit('activity:new', {
@@ -205,7 +223,7 @@ const updateTask = async (req, res, next) => {
 
         // Update task with whitelisted fields
         const allowedFields = [
-            'title', 'description', 'status', 'priority', 'order', 'assignee', 
+            'title', 'description', 'status', 'priority', 'order', 'assignee',
             'dueDate', 'startDate', 'estimatedTime', 'customFields', 'subtasks',
             'dependencies', 'timeEntries'
         ];
@@ -239,7 +257,7 @@ const updateTask = async (req, res, next) => {
         req.io.to(project._id.toString()).emit('task:updated', {
             taskId: task._id,
             updates: req.body,
-            projectId: project._id
+            projectId: project._id.toString()
         });
 
         req.io.to(project._id.toString()).emit('activity:new', {
@@ -259,7 +277,7 @@ const updateTask = async (req, res, next) => {
 
 // @desc    Delete task
 // @route   DELETE /api/tasks/:id
-// @access  Private (Project member)
+// @access  Private (Admin, Project Owner, or Project Manager)
 const deleteTask = async (req, res, next) => {
     try {
         const task = await Task.findById(req.params.id);
@@ -277,6 +295,14 @@ const deleteTask = async (req, res, next) => {
             return res.status(403).json({
                 success: false,
                 error: 'Not a project member'
+            });
+        }
+
+        // Check if user has permission to delete tasks (Admin, Owner, or PM)
+        if (!canDeleteTask(req.user, project, req.user._id)) {
+            return res.status(403).json({
+                success: false,
+                error: 'User role not authorized to delete tasks. Only Admin, Project Owner, or Project Manager can delete tasks.'
             });
         }
 
@@ -299,7 +325,7 @@ const deleteTask = async (req, res, next) => {
         // Broadcast real-time update
         req.io.to(projectId.toString()).emit('task:deleted', {
             taskId: task._id,
-            projectId
+            projectId: projectId.toString()
         });
 
         req.io.to(projectId.toString()).emit('activity:new', {
@@ -374,7 +400,7 @@ const moveTask = async (req, res, next) => {
             taskId: task._id,
             oldStatus,
             newStatus,
-            projectId: task.project
+            projectId: task.project.toString()
         });
 
         req.io.to(task.project.toString()).emit('activity:new', {
@@ -455,7 +481,7 @@ const reorderTasks = async (req, res, next) => {
 const addComment = async (req, res, next) => {
     try {
         const { text } = req.body;
-        
+
         if (!text || !text.trim()) {
             return res.status(400).json({ success: false, error: 'Comment text is required' });
         }
@@ -513,11 +539,11 @@ const removeComment = async (req, res, next) => {
         }
 
         const comment = task.comments[commentIndex];
-        
+
         // Check authorization
         const isOwner = comment.user.toString() === req.user._id.toString();
         const isPMOrAdmin = req.user.role === 'pm' || req.user.role === 'admin';
-        
+
         if (!isOwner && !isPMOrAdmin) {
             return res.status(403).json({ success: false, error: 'Not authorized to delete this comment' });
         }
@@ -545,7 +571,7 @@ const removeComment = async (req, res, next) => {
 const addAttachment = async (req, res, next) => {
     try {
         const { name, url, type, size } = req.body;
-        
+
         if (!name || !url) {
             return res.status(400).json({ success: false, error: 'Attachment name and url are required' });
         }
