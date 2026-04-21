@@ -8,17 +8,17 @@ export const SocketContext = createContext(null);
 const SOCKET_URL = config.SOCKET_URL;
 
 export const SocketProvider = ({ children }) => {
-    const { token, user, isAuthenticated } = useContext(AuthContext);
+    const { user, isAuthenticated } = useContext(AuthContext);
     const [socket, setSocket] = useState(null);
     const [connected, setConnected] = useState(false);
     const [currentProjectId, setCurrentProjectId] = useState(null);
 
     // Initialize socket connection when authenticated
     useEffect(() => {
-        if (isAuthenticated && token) {
+        if (isAuthenticated) {
             const newSocket = io(SOCKET_URL, {
-                auth: { token },
                 transports: ['websocket', 'polling'],
+                withCredentials: true,
                 reconnection: true,
                 reconnectionAttempts: 5,
                 reconnectionDelay: 1000
@@ -51,7 +51,7 @@ export const SocketProvider = ({ children }) => {
                 socket.disconnect();
             }
         };
-    }, [isAuthenticated, token]);
+    }, [isAuthenticated]);
 
     // Join a project room
     const joinProject = useCallback((projectId) => {

@@ -55,25 +55,17 @@ const CreateProjectModal = ({ isOpen, onClose, onCreate }) => {
 
         setIsLoading(true);
 
-        // Simulate API call
-        setTimeout(() => {
-            const newProject = {
-                id: Date.now(),
-                name: formData.name,
-                description: formData.description,
-                taskCount: 0,
-                activeTaskCount: 0,
-                members: formData.members.length + 1, // Current user + invited members
-                updatedAt: 'Just now'
-            };
-
-            onCreate(newProject);
-            // toast.success('Project created successfully!');
-            setFormData({ name: '', description: '', members: [] }); // Reset form
+        try {
+            await onCreate({
+                name: formData.name.trim(),
+                description: formData.description.trim()
+            });
+            setFormData({ name: '', description: '', members: [] });
             setMemberEmail('');
-            setIsLoading(false);
             onClose();
-        }, 800);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (

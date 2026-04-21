@@ -1,6 +1,7 @@
 const express = require('express');
 const http = require('http');
 const cors = require('cors');
+const cookieParser = require('cookie-parser');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const mongoSanitize = require('express-mongo-sanitize');
@@ -30,16 +31,16 @@ const app = express();
 app.set('trust proxy', 1);
 const server = http.createServer(app);
 
+const allowedOrigins = [process.env.CLIENT_URL, 'http://localhost:5173'].filter(Boolean);
+
 // Initialize Socket.io
 const io = socketio(server, {
     cors: {
-        origin: process.env.CLIENT_URL,
+        origin: allowedOrigins,
         credentials: true
     },
     transports: ['websocket', 'polling']
 });
-
-const allowedOrigins = [process.env.CLIENT_URL, 'http://localhost:5173'];
 app.use(cors({
     origin: allowedOrigins,
     credentials: true
@@ -63,14 +64,11 @@ app.use('/api/', limiter);
 
 // Security middleware
 app.use(helmet());
-app.use(cors({
-    origin: process.env.CLIENT_URL,
-    credentials: true
-}));
 
 // Body parser middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
 
 // Data sanitization against NoSQL injection
 app.use(mongoSanitize());

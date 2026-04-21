@@ -1,6 +1,13 @@
 const User = require('../models/User');
 const generateToken = require('../utils/generateToken');
 
+const getCookieOptions = () => ({
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 7 * 24 * 60 * 60 * 1000
+});
+
 // @desc    Register user
 // @route   POST /api/auth/signup
 // @access  Public
@@ -27,6 +34,8 @@ const signup = async (req, res, next) => {
 
         // Generate token
         const token = generateToken(user._id);
+
+        res.cookie('token', token, getCookieOptions());
 
         res.status(201).json({
             success: true,
@@ -74,6 +83,8 @@ const login = async (req, res, next) => {
         // Generate token
         const token = generateToken(user._id);
 
+        res.cookie('token', token, getCookieOptions());
+
         res.status(200).json({
             success: true,
             token,
@@ -110,8 +121,21 @@ const getMe = async (req, res, next) => {
     }
 };
 
+// @desc    Logout user
+// @route   POST /api/auth/logout
+// @access  Private
+const logout = async (req, res, next) => {
+    try {
+        res.clearCookie('token', getCookieOptions());
+        res.status(200).json({ success: true, data: {} });
+    } catch (error) {
+        next(error);
+    }
+};
+
 module.exports = {
     signup,
     login,
-    getMe
+    getMe,
+    logout
 };

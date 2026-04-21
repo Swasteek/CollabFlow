@@ -7,24 +7,11 @@ const API_URL = config.API_URL;
 const api = axios.create({
     baseURL: API_URL,
     timeout: config.TIMEOUT,
+    withCredentials: true,
     headers: {
         'Content-Type': 'application/json'
     }
 });
-
-// Request interceptor - add auth token
-api.interceptors.request.use(
-    (config) => {
-        const token = localStorage.getItem('token');
-        if (token) {
-            config.headers.Authorization = `Bearer ${token}`;
-        }
-        return config;
-    },
-    (error) => {
-        return Promise.reject(error);
-    }
-);
 
 // Response interceptor - handle errors globally
 api.interceptors.response.use(
@@ -40,9 +27,6 @@ api.interceptors.response.use(
             // Global error handling for specific codes
             switch (error.response.status) {
                 case 401:
-                    // Unauthorized - clear token and redirect to login
-                    localStorage.removeItem('token');
-                    localStorage.removeItem('user');
                     if (window.location.pathname !== '/login') {
                         window.location.href = '/login';
                     }
@@ -75,7 +59,8 @@ api.interceptors.response.use(
 export const authAPI = {
     login: (credentials) => api.post('/auth/login', credentials),
     signup: (userData) => api.post('/auth/signup', userData),
-    getProfile: () => api.get('/auth/me') // Backend uses /me not /profile
+    getProfile: () => api.get('/auth/me'), // Backend uses /me not /profile
+    logout: () => api.post('/auth/logout')
 };
 
 // Projects endpoints

@@ -63,19 +63,25 @@ export const transformTaskFromBackend = (backendTask) => {
         id: backendTask._id || backendTask.id,
         status: toFrontendStatus(backendTask.status || 'todo'),
         priority: toFrontendPriority(backendTask.priority || 'medium'),
-        assignee: backendTask.assignee?._id || backendTask.assignee || '',
+        assignee: backendTask.assignee || null,
+        assigneeId: backendTask.assignee?._id || backendTask.assignee || '',
         assigneeName: backendTask.assignee?.name || '',
         assigneeAvatar: backendTask.assignee?.avatar || '',
-        dueDate: backendTask.dueDate ? new Date(backendTask.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''
+        dueDate: backendTask.dueDate || '',
+        displayDueDate: backendTask.dueDate
+            ? new Date(backendTask.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+            : ''
     };
 };
 
 export const transformTaskToBackend = (frontendTask) => {
+    const assigneeValue = frontendTask.assignee?._id || frontendTask.assignee;
     const backendTask = {
         ...frontendTask,
         status: toBackendStatus(frontendTask.status || 'To Do'),
         priority: toBackendPriority(frontendTask.priority || 'Medium'),
-        order: frontendTask.order !== undefined ? frontendTask.order : 0
+        order: frontendTask.order !== undefined ? frontendTask.order : 0,
+        assignee: assigneeValue
     };
 
     // Remove empty optional strings to avoid backend validation failures (e.g., empty dueDate)
@@ -85,6 +91,8 @@ export const transformTaskToBackend = (frontendTask) => {
 
     // Remove frontend-specific fields
     delete backendTask.id; // Backend uses _id
+    delete backendTask.assigneeId;
+    delete backendTask.displayDueDate;
 
     return backendTask;
 };

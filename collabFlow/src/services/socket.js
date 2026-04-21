@@ -6,14 +6,14 @@ const SOCKET_URL = config.SOCKET_URL;
 let socket = null;
 
 // Initialize socket connection
-export const initSocket = (token) => {
+export const initSocket = () => {
     if (socket) {
         socket.disconnect();
     }
 
     socket = io(SOCKET_URL, {
-        auth: { token },
         transports: ['websocket', 'polling'],
+        withCredentials: true,
         reconnection: true,
         reconnectionAttempts: 5,
         reconnectionDelay: 1000

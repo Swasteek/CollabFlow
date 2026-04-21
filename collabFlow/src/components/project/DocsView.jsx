@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import DOMPurify from 'dompurify';
 import ReactQuill from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css'; // ES6
 import { Plus, Trash2, Save, FileText } from 'lucide-react';
@@ -164,7 +165,11 @@ const DocsView = ({ project, onUpdateProject }) => {
                             <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-slate-900/30">
                                 <div 
                                     className="prose prose-invert prose-blue max-w-4xl"
-                                    dangerouslySetInnerHTML={{ __html: activeDoc.content || '<p class="text-slate-500 italic">Empty document.</p>' }}
+                                    dangerouslySetInnerHTML={{
+                                        __html: DOMPurify.sanitize(
+                                            activeDoc.content || '<p class="text-slate-500 italic">Empty document.</p>'
+                                        )
+                                    }}
                                 />
                             </div>
                         </div>

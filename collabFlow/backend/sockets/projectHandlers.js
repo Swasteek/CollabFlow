@@ -2,14 +2,20 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Project = require('../models/Project');
 const Task = require('../models/Task');
-const { TASK_STATUS } = require('../config/constants');
 const logger = require('../utils/logger');
 
 module.exports = function projectHandlers(io) {
     // Socket authentication middleware
+    const getTokenFromCookie = (cookieHeader) => {
+        if (!cookieHeader) return null;
+        const cookies = cookieHeader.split(';').map(cookie => cookie.trim());
+        const tokenCookie = cookies.find(cookie => cookie.startsWith('token='));
+        return tokenCookie ? decodeURIComponent(tokenCookie.split('=')[1]) : null;
+    };
+
     io.use(async (socket, next) => {
         try {
-            const token = socket.handshake.auth.token;
+            const token = socket.handshake.auth.token || getTokenFromCookie(socket.handshake.headers.cookie);
 
             if (!token) {
                 return next(new Error('Authentication error: No token provided'));
@@ -100,11 +106,6 @@ module.exports = function projectHandlers(io) {
         socket.on('task:move', async (data) => {
             try {
                 const { taskId, newStatus, projectId } = data;
-
-                if (!Object.values(TASK_STATUS).includes(newStatus)) {
-                    socket.emit('error', { message: 'Invalid task status' });
-                    return;
-                }
 
                 // Validate project membership
                 const project = await Project.findById(projectId);

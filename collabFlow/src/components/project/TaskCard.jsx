@@ -12,6 +12,10 @@ const TaskCard = ({ task, index, onClick }) => {
         }
     };
 
+    const dueDateLabel = task.displayDueDate || (task.dueDate
+        ? new Date(task.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+        : '');
+
     return (
         <Draggable draggableId={task.id} index={index}>
             {(provided, snapshot) => (
@@ -36,10 +40,10 @@ const TaskCard = ({ task, index, onClick }) => {
 
                     <div className="flex items-center justify-between mt-3">
                         <div className="flex items-center gap-2 text-xs text-slate-400">
-                            {task.dueDate && (
+                            {dueDateLabel && (
                                 <div className="flex items-center gap-1">
                                     <Calendar size={12} />
-                                    <span>{task.dueDate}</span>
+                                    <span>{dueDateLabel}</span>
                                 </div>
                             )}
                         </div>

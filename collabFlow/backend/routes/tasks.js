@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { body } = require('express-validator');
-const { TASK_STATUS, PRIORITY_LEVELS } = require('../config/constants');
+const { PRIORITY_LEVELS } = require('../config/constants');
 const {
     createTask,
     updateTask,
@@ -37,7 +37,7 @@ const createTaskValidation = [
         .withMessage('Description cannot be more than 2000 characters'),
     body('status')
         .optional()
-        .isIn(Object.values(TASK_STATUS))
+        .isString()
         .withMessage('Invalid status'),
     body('priority')
         .optional()
@@ -64,7 +64,7 @@ const updateTaskValidation = [
         .withMessage('Description cannot be more than 2000 characters'),
     body('status')
         .optional()
-        .isIn(Object.values(TASK_STATUS))
+        .isString()
         .withMessage('Invalid status'),
     body('priority')
         .optional()
@@ -80,8 +80,8 @@ const moveTaskValidation = [
     body('newStatus')
         .notEmpty()
         .withMessage('New status is required')
-        .isIn(Object.values(TASK_STATUS))
-        .withMessage('Invalid status')
+    .isString()
+    .withMessage('Invalid status')
 ];
 
 // All routes require authentication
