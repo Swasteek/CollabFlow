@@ -107,15 +107,22 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 
-// Connect to MongoDB and start server
-connectDB().then(() => {
-    server.listen(PORT, () => {
-        logger.info(`Server running in ${process.env.NODE_ENV} mode on port ${PORT} ✅`);
-    });
-}).catch((err) => {
-    logger.error('Failed to connect to MongoDB:', err.message);
-    process.exit(1);
-});
+const startServer = async () => {
+    try {
+        await connectDB();
+        server.listen(PORT, () => {
+            logger.info(`Server running in ${process.env.NODE_ENV} mode on port ${PORT} ✅`);
+        });
+    } catch (err) {
+        logger.error('Failed to connect to MongoDB:', err.message);
+        process.exit(1);
+    }
+};
+
+// Auto-start only when executed directly (not when imported by tests).
+if (require.main === module) {
+    startServer();
+}
 
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (err) => {

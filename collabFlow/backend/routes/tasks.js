@@ -11,7 +11,8 @@ const {
     reorderTasks,
     addComment,
     removeComment,
-    addAttachment
+    addAttachment,
+    getTaskById
 } = require('../controllers/taskController');
 // const { protect } = require('../middleware/auth');
 const validate = require('../middleware/validator');
@@ -97,6 +98,7 @@ router.post('/:id/attachments', [
     body('name').notEmpty().withMessage('Attachment name is required'),
     body('url').isURL().withMessage('Valid URL is required')
 ], validate, addAttachment);
+router.get('/:id', getTaskById);
 router.put('/:id', updateTaskValidation, validate, updateTask);
 router.delete('/:id', deleteTask);
 

@@ -1,6 +1,6 @@
-import React, { createContext, useState, useEffect, useCallback } from 'react';
+/* eslint-disable react/prop-types */
+import React, { createContext, useState, useEffect, useCallback, useMemo } from 'react';
 import api, { authAPI } from '../services/api';
-import config from '../config';
 
 export const AuthContext = createContext(null);
 
@@ -18,8 +18,22 @@ export const AuthProvider = ({ children }) => {
             const storedUser = localStorage.getItem('user');
 
             if (storedToken && storedUser) {
+                let parsedUser = null;
+                try {
+                    parsedUser = JSON.parse(storedUser);
+                } catch (error) {
+                    console.error('Invalid persisted auth state:', error);
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('user');
+                    delete api.defaults.headers.common['Authorization'];
+                    setToken(null);
+                    setUser(null);
+                    setIsLoading(false);
+                    return;
+                }
+
                 setToken(storedToken);
-                setUser(JSON.parse(storedUser));
+                setUser(parsedUser);
                 api.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
 
                 // Optionally verify token with backend
@@ -30,6 +44,7 @@ export const AuthProvider = ({ children }) => {
                     const userData = response.data.user || response.data.data?.user || response.data.data || response.data;
                     setUser(userData);
                 } catch (error) {
+                    console.error('Auth token verification failed:', error);
                     // Token invalid, clear auth
                     localStorage.removeItem('token');
                     localStorage.removeItem('user');
@@ -104,7 +119,7 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem('user', JSON.stringify(updatedUser));
     }, [user]);
 
-    const value = {
+    const value = useMemo(() => ({
         user,
         token,
         isAuthenticated: !!token && !!user,
@@ -113,7 +128,7 @@ export const AuthProvider = ({ children }) => {
         signup,
         logout,
         updateUser
-    };
+    }), [user, token, isLoading, login, signup, logout, updateUser]);
 
     return (
         <AuthContext.Provider value={value}>

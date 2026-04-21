@@ -253,9 +253,9 @@ const inviteMembers = async (req, res, next) => {
             if (!isMember) {
                 let projectRole = PROJECT_ROLES.MEMBER;
 
-                if (user.role === 'PM' || user.role === 'admin') {
+                if (user.role === 'pm' || user.role === 'admin') {
                     projectRole = PROJECT_ROLES.PM;
-                } else if (user.role === 'Client') {
+                } else if (user.role === 'client') {
                     projectRole = PROJECT_ROLES.CLIENT;
                 }
 

@@ -1,9 +1,11 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Project = require('../models/Project');
+const Task = require('../models/Task');
+const { TASK_STATUS } = require('../config/constants');
 const logger = require('../utils/logger');
 
-module.exports = (io) => {
+module.exports = function projectHandlers(io) {
     // Socket authentication middleware
     io.use(async (socket, next) => {
         try {
@@ -99,8 +101,18 @@ module.exports = (io) => {
             try {
                 const { taskId, newStatus, projectId } = data;
 
+                if (!Object.values(TASK_STATUS).includes(newStatus)) {
+                    socket.emit('error', { message: 'Invalid task status' });
+                    return;
+                }
+
                 // Validate project membership
                 const project = await Project.findById(projectId);
+                if (!project) {
+                    socket.emit('error', { message: 'Project not found' });
+                    return;
+                }
+
                 const isMember = project.members.some(
                     member => member.user.toString() === socket.userId.toString()
                 );
@@ -110,16 +122,33 @@ module.exports = (io) => {
                     return;
                 }
 
-                // Fetch the task to get current status as oldStatus
-                const Task = require('../models/Task');
+                // Fetch the task and persist state change to avoid broadcast-only desync
                 const task = await Task.findById(taskId);
-                const oldStatus = task ? task.status : undefined;
+                if (!task) {
+                    socket.emit('error', { message: 'Task not found' });
+                    return;
+                }
+
+                if (task.project.toString() !== projectId.toString()) {
+                    socket.emit('error', { message: 'Task does not belong to this project' });
+                    return;
+                }
+
+                const oldStatus = task.status;
+                if (oldStatus === newStatus) {
+                    return;
+                }
+
+                task.status = newStatus;
+                task.updatedAt = Date.now();
+                await task.save();
 
                 // Broadcast to room (except sender)
                 socket.to(projectId).emit('task:moved', {
                     taskId,
                     oldStatus,
                     newStatus,
+                    projectId,
                     movedBy: socket.userId
                 });
 

@@ -7,10 +7,10 @@ async function addRolesToExistingUsers() {
 
         const User = require('./models/User');
 
-        // Update all existing users to have 'Member' role
+        // Update all existing users to have 'member' role
         const result = await User.updateMany(
             { role: { $exists: false } }, // Find users without role field
-            { $set: { role: 'Member' } }  // Set default role
+            { $set: { role: 'member' } }  // Set default role
         );
 
         console.log(`Updated ${result.modifiedCount} users with default role`);

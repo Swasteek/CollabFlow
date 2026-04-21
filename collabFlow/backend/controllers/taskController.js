@@ -499,13 +499,22 @@ const addComment = async (req, res, next) => {
     try {
         const { text } = req.body;
 
-        if (!text || !text.trim()) {
+        if (!text?.trim()) {
             return res.status(400).json({ success: false, error: 'Comment text is required' });
         }
 
         const task = await Task.findById(req.params.id);
         if (!task) {
             return res.status(404).json({ success: false, error: 'Task not found' });
+        }
+
+        const project = await Project.findById(task.project);
+        if (!project) {
+            return res.status(404).json({ success: false, error: 'Project not found' });
+        }
+
+        if (!isProjectMember(project, req.user._id)) {
+            return res.status(403).json({ success: false, error: 'Not a project member' });
         }
 
         // Add comment
@@ -527,13 +536,13 @@ const addComment = async (req, res, next) => {
             req.io.to(task.project.toString()).emit('task:comment_added', {
                 taskId: task._id,
                 projectId: task.project,
-                comment: task.comments[task.comments.length - 1]
+                comment: task.comments.at(-1)
             });
         }
 
         res.status(201).json({
             success: true,
-            data: task.comments[task.comments.length - 1]
+            data: task.comments.at(-1)
         });
     } catch (error) {
         next(error);
@@ -550,6 +559,15 @@ const removeComment = async (req, res, next) => {
             return res.status(404).json({ success: false, error: 'Task not found' });
         }
 
+        const project = await Project.findById(task.project);
+        if (!project) {
+            return res.status(404).json({ success: false, error: 'Project not found' });
+        }
+
+        if (!isProjectMember(project, req.user._id)) {
+            return res.status(403).json({ success: false, error: 'Not a project member' });
+        }
+
         const commentIndex = task.comments.findIndex(c => c._id.toString() === req.params.commentId);
         if (commentIndex === -1) {
             return res.status(404).json({ success: false, error: 'Comment not found' });
@@ -559,9 +577,9 @@ const removeComment = async (req, res, next) => {
 
         // Check authorization
         const isOwner = comment.user.toString() === req.user._id.toString();
-        const isPMOrAdmin = req.user.role === 'pm' || req.user.role === 'admin';
+        const canModerate = canDeleteTask(req.user, project, req.user._id);
 
-        if (!isOwner && !isPMOrAdmin) {
+        if (!isOwner && !canModerate) {
             return res.status(403).json({ success: false, error: 'Not authorized to delete this comment' });
         }
 
@@ -598,6 +616,15 @@ const addAttachment = async (req, res, next) => {
             return res.status(404).json({ success: false, error: 'Task not found' });
         }
 
+        const project = await Project.findById(task.project);
+        if (!project) {
+            return res.status(404).json({ success: false, error: 'Project not found' });
+        }
+
+        if (!isProjectMember(project, req.user._id)) {
+            return res.status(403).json({ success: false, error: 'Not a project member' });
+        }
+
         const newAttachment = {
             name,
             url,
@@ -614,9 +641,44 @@ const addAttachment = async (req, res, next) => {
 
         res.status(201).json({
             success: true,
-            data: task.attachments[task.attachments.length - 1]
+            data: task.attachments.at(-1)
         });
     } catch (error) {
+        next(error);
+    }
+};
+
+// @desc    Get task by id
+// @route   GET /api/tasks/:id
+// @access  Private (Project member)
+const getTaskById = async (req, res, next) => {
+    try {
+        const task = await Task.findById(req.params.id)
+            .populate('assignee', 'name email avatar')
+            .populate('createdBy', 'name email avatar')
+            .populate('project');
+
+        if (!task) {
+            return res.status(404).json({
+                success: false,
+                error: 'Task not found'
+            });
+        }
+
+        const project = task.project;
+        if (!isProjectMember(project, req.user._id) && req.user.role !== 'admin') {
+            return res.status(403).json({
+                success: false,
+                error: 'Not a project member'
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            data: task
+        });
+    } catch (error) {
+        logger.error('[getTaskById] Error:', error);
         next(error);
     }
 };
@@ -627,6 +689,7 @@ module.exports = {
     deleteTask,
     moveTask,
     getTasksByProject,
+    getTaskById,
     reorderTasks,
     addComment,
     removeComment,
