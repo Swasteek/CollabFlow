@@ -1,12 +1,15 @@
 const User = require('../models/User');
 const generateToken = require('../utils/generateToken');
 
-const getCookieOptions = () => ({
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
-    maxAge: 7 * 24 * 60 * 60 * 1000
-});
+const getCookieOptions = () => {
+    const isProd = process.env.NODE_ENV === 'production';
+    return {
+        httpOnly: true,
+        sameSite: isProd ? 'none' : 'lax',
+        secure: isProd,
+        maxAge: 7 * 24 * 60 * 60 * 1000
+    };
+};
 
 // @desc    Register user
 // @route   POST /api/auth/signup
